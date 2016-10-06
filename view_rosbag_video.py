@@ -10,6 +10,7 @@ Update enable left, center and right camera selection.  Currently all three came
 Update to enable display of trained steering data (green) as compared to actual (blue projection).
 
 History:
+2016/10/06: Update to add --skip option to skip the first X seconds of data from rosbag.
 2016/10/02: Initial version to display left, center, right cameras and steering angle.
 """
 
