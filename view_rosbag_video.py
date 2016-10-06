@@ -18,6 +18,7 @@ import sys
 import numpy as np
 import pygame
 import rosbag
+import datetime
 
 #from keras.models import model_from_json
 
@@ -113,42 +114,55 @@ def draw_path_on(img, speed_ms, angle_steers, color=(0,0,255), shift_from_mid=0)
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Udacity SDC Challenge-2 Video viewer')
   parser.add_argument('--dataset', type=str, default="dataset.bag", help='Dataset/ROS Bag name')
+  parser.add_argument('--skip', type=int, default="0", help='skip seconds')
   args = parser.parse_args()
 
   dataset = args.dataset
-  skip = 0
+  skip = args.skip
+  startsec = 0
 
+  print "reading rosbag ", dataset
   bag = rosbag.Bag(dataset, 'r')
   for topic, msg, t in bag.read_messages(topics=['/center_camera/image_color','/right_camera/image_color','/left_camera/image_color','/vehicle/steering_report']):
-    if topic in ['/center_camera/image_color','/right_camera/image_color','/left_camera/image_color']:
-        print(topic, msg.header.seq, t-msg.header.stamp, msg.height, msg.width, msg.encoding, t)
+    if startsec == 0:
+        startsec = t.to_sec()
+        if skip < 24*60*60:
+            skipping = t.to_sec() + skip
+            print "skipping ", skip, " seconds from ", startsec, " to ", skipping, " ..."
+        else:
+            skipping = skip
+            print "skipping to ", skip, " from ", startsec, " ..."
     else:
-        print(topic, msg.header.seq, t-msg.header.stamp, msg.steering_wheel_angle, t)
-        angle_steers = msg.steering_wheel_angle
-
-    try: 
-        if topic in ['/center_camera/image_color','/right_camera/image_color','/left_camera/image_color']:
-            # RGB_str = msg.data
-            RGB_str = np.fromstring(msg.data, dtype='uint8').reshape((640*480),3)[:, (2, 1, 0)].tostring() 
-
-            if topic == '/left_camera/image_color':
-                imgleft = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
+        if t.to_sec() > skipping:
+            if topic in ['/center_camera/image_color','/right_camera/image_color','/left_camera/image_color']:
+                print(topic, msg.header.seq, t-msg.header.stamp, msg.height, msg.width, msg.encoding, t)
             else:
-                if topic == '/center_camera/image_color':
-                    imgcenter = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
-                else:
-                    imgright = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
+                print(topic, msg.header.seq, t-msg.header.stamp, msg.steering_wheel_angle, t)
+                angle_steers = msg.steering_wheel_angle
+        
+            try: 
+                if topic in ['/center_camera/image_color','/right_camera/image_color','/left_camera/image_color']:
+                    # RGB_str = msg.data
+                    RGB_str = np.fromstring(msg.data, dtype='uint8').reshape((640*480),3)[:, (2, 1, 0)].tostring() 
+        
+                    if topic == '/left_camera/image_color':
+                        imgleft = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
+                    else:
+                        if topic == '/center_camera/image_color':
+                            imgcenter = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
+                        else:
+                            imgright = pygame.transform.scale(pygame.image.fromstring(RGB_str, (640, 480), 'RGB'), (320, 240))
+        
+            except Exception, e:
+               print("Error converting string to PyGame surface in StringToSurface", e)
 
-    except Exception, e:
-       print("Error converting string to PyGame surface in StringToSurface", e)
+            draw_path_on(imgleft, 0, angle_steers*20, (0,0,255), -10)
+            draw_path_on(imgcenter, 0, angle_steers*20, (0,0,255), -20)
+            draw_path_on(imgright, 0, angle_steers*20, (0,0,255), 0)
 
-    draw_path_on(imgleft, 0, angle_steers*20, (0,0,255), -10)
-    draw_path_on(imgcenter, 0, angle_steers*20, (0,0,255), -20)
-    draw_path_on(imgright, 0, angle_steers*20, (0,0,255), 0)
+            screen.blit(imgleft, (0,0))
+            screen.blit(imgcenter, (320,0))
+            screen.blit(imgright, (640,0))
 
-    screen.blit(imgleft, (0,0))
-    screen.blit(imgcenter, (320,0))
-    screen.blit(imgright, (640,0))
-
-    pygame.display.flip()
+            pygame.display.flip()
 
